@@ -41,6 +41,7 @@ jobs:
           install: >-
             p7zip
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libgomp
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
 
@@ -65,9 +66,22 @@ jobs:
           dist=axllm-axcl-windows-ucrt64
           mkdir -p "$dist"
           cp build/axllm.exe "$dist/"
-          for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll libgomp-1.dll; do
-            cp "/ucrt64/bin/$dll" "$dist/"
+          # Bundle every UCRT64 DLL axllm.exe needs, following imports transitively
+          # (libstdc++ -> libgcc_s/libwinpthread, OpenMP -> libgomp, ...).
+          todo="build/axllm.exe"
+          while [ -n "$todo" ]; do
+            next=""
+            for bin in $todo; do
+              for dll in $(objdump -p "$bin" | sed -n 's/^[[:space:]]*DLL Name: //p'); do
+                if [ -f "/ucrt64/bin/$dll" ] && [ ! -f "$dist/$dll" ]; then
+                  cp "/ucrt64/bin/$dll" "$dist/"
+                  next="$next $dist/$dll"
+                fi
+              done
+            done
+            todo="$next"
           done
+          ls "$dist"
           cat > "$dist/README.txt" <<EOF
           axllm (AXCL backend) for Windows x64, built from ${GITHUB_SHA::12}.
 
