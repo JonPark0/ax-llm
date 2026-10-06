@@ -103,11 +103,21 @@ jobs:
           name: axllm-axcl-windows-ucrt64
           path: axllm-axcl-windows-ucrt64.zip
 
+      # The release action only sets the target when it creates the tag, so move
+      # the rolling tag to the commit this zip was built from on every push.
+      - name: Point the rolling tag at this build
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/windows' }}
+        shell: pwsh
+        run: |
+          git tag -f windows-latest $env:GITHUB_SHA
+          git push -f origin refs/tags/windows-latest
+
       - name: Publish rolling release
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/windows' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-latest
+          target_commitish: ${{ github.sha }}
           name: Windows (AXCL) latest
           prerelease: true
           files: axllm-axcl-windows-ucrt64.zip
