@@ -1,0 +1,103 @@
+name: Windows (AXCL)
+
+# Builds the AXCL (PCIe card) backend for Windows with MSYS2 UCRT64 and packages
+# axllm.exe together with the MinGW runtime DLLs it needs. The AXCL driver and
+# runtime DLLs (libaxcl_rt.dll ...) are NOT bundled: install the AXCL Windows
+# package and put its bin directory on PATH.
+
+on:
+  push:
+    branches: [windows]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  # AXCL Windows SDK, as linked from M5Stack's LLM-8850 Windows guide. Only its
+  # headers and import libraries are used for linking. The file at this URL has
+  # been replaced in place before, so the hash pins the version this was tested with.
+  AXCL_URL: https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/ax8850_card/axcl_win64_setup_V3.6.4_20250822020158_NO4955.exe
+  AXCL_SHA256: c9b3f3dd75de6f7d487980c2bdcc6b707221e9b9f03ce12ae3f67600e14791ed
+
+jobs:
+  build:
+    name: AXCL Windows x64 (UCRT64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            p7zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
+      - name: Fetch AXCL SDK
+        run: |
+          curl -fsSL -o axcl_setup.exe "$AXCL_URL"
+          echo "$AXCL_SHA256  axcl_setup.exe" | sha256sum -c -
+          7z x -y -oaxcl_sdk axcl_setup.exe > /dev/null
+          ls axcl_sdk/axcl/out/axcl_win_x64/lib/libaxcl_rt.lib
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_AX650=OFF -DBUILD_AXCL=ON \
+            -DAXCL_DIR="$(cygpath -m "$PWD/axcl_sdk/axcl/out/axcl_win_x64")"
+
+      - name: Build
+        run: cmake --build build --target axllm --parallel
+
+      - name: Package
+        run: |
+          dist=axllm-axcl-windows-ucrt64
+          mkdir -p "$dist"
+          cp build/axllm.exe "$dist/"
+          for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll libgomp-1.dll; do
+            cp "/ucrt64/bin/$dll" "$dist/"
+          done
+          cat > "$dist/README.txt" <<EOF
+          axllm (AXCL backend) for Windows x64, built from ${GITHUB_SHA::12}.
+
+          Requires the AXCL Windows package (driver + runtime). Put its bin directory,
+          e.g. C:\AXCL\axcl\out\axcl_win_x64\bin, on PATH, then:
+
+            axllm.exe run  <model_dir>
+            axllm.exe serve <model_dir> --port 8000
+
+          Decode IO optimizations are on by default; AXLLM_DECODE_IO_SHARE=0 restores
+          the original per-layer path and AXLLM_DECODE_KV_DIRECT=0 turns off only the
+          direct K/V writes.
+          EOF
+          7z a -tzip "$dist.zip" "$dist" > /dev/null
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: axllm-axcl-windows-ucrt64
+          path: axllm-axcl-windows-ucrt64.zip
+
+      - name: Publish rolling release
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/windows' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-latest
+          name: Windows (AXCL) latest
+          prerelease: true
+          files: axllm-axcl-windows-ucrt64.zip
+          body: |
+            Rolling Windows build of the `windows` branch, refreshed on every push.
+            AXCL backend for the LLM-8850 / AX8850 PCIe card, built with MSYS2 UCRT64.
+            The AXCL Windows driver and runtime must be installed separately.
