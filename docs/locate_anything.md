@@ -1,5 +1,7 @@
 # LocateAnything-3B (grounding / detection VLM)
 
+**English** | [中文](zh/locate_anything.md) | [한국어](ko/locate_anything.md)
+
 `serve`/`run` support for [nvidia/LocateAnything-3B](https://huggingface.co/nvidia/LocateAnything-3B)
 (AXERA build: `AXERA-TECH/LocateAnything-3B`), a Qwen2.5-3B visual-grounding model that does
 zero-shot **object detection, phrase grounding, OCR / scene-text detection, document layout,

@@ -1,5 +1,7 @@
 # Vision/VLM Branch Patterns (Notes)
 
+**English** | [中文](zh/vision_encoder_patterns.md) | [한국어](ko/vision_encoder_patterns.md)
+
 This repo's `axllm` branch currently runs **text-only** models by:
 
 - `tokenizer->encode(history)` to token ids

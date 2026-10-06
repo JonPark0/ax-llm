@@ -1,5 +1,7 @@
 # AX-LLM
 
+[English](README_en.md) | **中文** | [한국어](README_ko.md)
+
 ![GitHub License](https://img.shields.io/github/license/AXERA-TECH/ax-llm)
 
 ## 简介

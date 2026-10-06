@@ -1,5 +1,7 @@
 # 配置文件说明（模型目录 `config.json`）
 
+[English](en/configuration.md) | **中文** | [한국어](ko/configuration.md)
+
 `axllm` 启动时读取 `<model_dir>/config.json`。下面按用途分组列出所有可用字段;**未列为必填的都是可选**,不填用默认值。
 
 > 路径类字段(`filename_*` / `template_filename_axmodel` / `post_config_path` 等)相对模型目录解析。

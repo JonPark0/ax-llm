@@ -1,5 +1,7 @@
 # AXLLM 支持 SD1.5 生图的实现说明
 
+[English](en/sd15_axllm_implementation.md) | **中文** | [한국어](ko/sd15_axllm_implementation.md)
+
 本文说明本分支中，`axllm serve` 是如何在 AX650 上以纯 C++ 方式运行
 基于 SD1.5 的 `lcm-lora-sdv1-5` 模型，并通过 OpenAI 兼容图片接口提供给
 前端 WebUI 使用的。
