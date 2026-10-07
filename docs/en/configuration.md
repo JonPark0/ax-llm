@@ -184,6 +184,8 @@ POST /v1/chat/completions
 
 With `model_type` = `embedding_gemma2`, axllm starts a `/v1/embeddings` server (no `run` mode, text input only). The model is one whole-sequence encoder axmodel per fixed length (for example 128/512/1024), not per-layer axmodels; the shortest model that fits the input is picked, and longer inputs are truncated keeping BOS and the final EOS.
 
+A converted model is published at [jonpark0/embeddinggemma-2-AX650](https://huggingface.co/jonpark0/embeddinggemma-2-AX650) (text, image and audio encoders; this server uses the text ones). Its `assets/` folder already contains a `config.json`, so `axllm serve <path>/assets` works as is.
+
 | Field | Default | Description |
 |---|---|---|
 | `encoder_axmodels` | — | Encoder axmodels (inputs `inputs_embeds` [1,L,512] and `valid` [1,L], output `embedding` [1,768]) |

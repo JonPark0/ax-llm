@@ -182,6 +182,8 @@ POST /v1/chat/completions
 
 `model_type` = `embedding_gemma2` 时以 `/v1/embeddings` 服务启动(不支持 `run`,仅文本输入)。模型为整序列编码器 axmodel(每个固定长度一个,如 128/512/1024),而不是逐层 axmodel;按输入 token 数自动选择能容纳的最短模型,超长输入保留 BOS 与末尾 EOS 截断。
 
+已转换好的模型见 [jonpark0/embeddinggemma-2-AX650](https://huggingface.co/jonpark0/embeddinggemma-2-AX650)(含文本、图像、音频编码器,本服务只用文本部分)。其 `assets/` 目录已带有 `config.json`,可直接 `axllm serve <路径>/assets`。
+
 | 字段 | 默认 | 说明 |
 |---|---|---|
 | `encoder_axmodels` | — | 编码器 axmodel 列表(输入 `inputs_embeds` [1,L,512]、`valid` [1,L],输出 `embedding` [1,768]) |

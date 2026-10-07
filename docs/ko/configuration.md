@@ -184,6 +184,8 @@ POST /v1/chat/completions
 
 `model_type` = `embedding_gemma2`이면 `/v1/embeddings` 서버로 시작합니다(`run` 모드 미지원, 텍스트 입력만). 모델은 층별 axmodel이 아니라 고정 길이(예: 128/512/1024)마다 하나씩인 전체 시퀀스 인코더 axmodel이며, 입력이 들어가는 가장 짧은 모델을 자동으로 고릅니다. 더 긴 입력은 BOS와 마지막 EOS를 남기고 잘라냅니다.
 
+변환한 모델은 [jonpark0/embeddinggemma-2-AX650](https://huggingface.co/jonpark0/embeddinggemma-2-AX650)에 있습니다(텍스트·이미지·음성 인코더 포함, 이 서버는 텍스트 부분만 사용). `assets/` 폴더에 `config.json`이 들어 있어 `axllm serve <경로>/assets`로 바로 띄울 수 있습니다.
+
 | 필드 | 기본값 | 설명 |
 |---|---|---|
 | `encoder_axmodels` | — | 인코더 axmodel 목록(입력 `inputs_embeds` [1,L,512]·`valid` [1,L], 출력 `embedding` [1,768]) |
