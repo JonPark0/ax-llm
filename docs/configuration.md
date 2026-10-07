@@ -1,154 +1,156 @@
-# 配置文件说明（模型目录 `config.json`）
+# Configuration file reference (model directory `config.json`)
 
-[English](en/configuration.md) | **中文** | [한국어](ko/configuration.md)
+**English** | [中文](zh/configuration.md) | [한국어](ko/configuration.md)
 
-`axllm` 启动时读取 `<model_dir>/config.json`。下面按用途分组列出所有可用字段;**未列为必填的都是可选**,不填用默认值。
+> Translated from the Chinese [original](zh/configuration.md). If the two differ, the original is authoritative.
 
-> 路径类字段(`filename_*` / `template_filename_axmodel` / `post_config_path` 等)相对模型目录解析。
+`axllm` reads `<model_dir>/config.json` at startup. All available fields are listed below, grouped by purpose; **any field not listed as required is optional**, and its default value is used when it is omitted.
 
-## 必填
+> Path fields (`filename_*` / `template_filename_axmodel` / `post_config_path`, etc.) are resolved relative to the model directory.
 
-| 字段 | 类型 | 说明 |
+## Required
+
+| Field | Type | Description |
 |---|---|---|
-| `model_name` | string | 模型名(显示在 `/v1/models`、日志) |
-| `tokenizer_type` | string | 分词器类型(如 `Qwen3` / `Qwen3VL` / `Gemma4VL` / `SmolLM2` …) |
-| `url_tokenizer_model` | string | **本地**分词器文件路径(如 `qwen3_tokenizer.txt`)。⚠ 字段名带 `url`、默认值带 `http` 都是历史遗留;**当前只读本地文件,不支持 HTTP** |
-| `template_filename_axmodel` | string | 每层 axmodel 文件名模板,含 `%d`(如 `qwen3_p128_l%d_together.axmodel`) |
-| `axmodel_num` | int | transformer 层数 |
-| `filename_post_axmodel` | string | 输出 logits 的 post axmodel |
-| `filename_tokens_embed` | string | token embedding 权重(bf16 bin) |
-| `tokens_embed_num` | int | 词表大小 |
-| `tokens_embed_size` | int | embedding 维度 |
+| `model_name` | string | Model name (shown in `/v1/models` and in logs) |
+| `tokenizer_type` | string | Tokenizer type (e.g. `Qwen3` / `Qwen3VL` / `Gemma4VL` / `SmolLM2` …) |
+| `url_tokenizer_model` | string | Path to a **local** tokenizer file (e.g. `qwen3_tokenizer.txt`). ⚠ The `url` in the field name and the `http` in the default value are both historical leftovers; **only local files are currently read, HTTP is not supported** |
+| `template_filename_axmodel` | string | File name template for the per-layer axmodel, containing `%d` (e.g. `qwen3_p128_l%d_together.axmodel`) |
+| `axmodel_num` | int | Number of transformer layers |
+| `filename_post_axmodel` | string | The post axmodel that outputs the logits |
+| `filename_tokens_embed` | string | Token embedding weights (bf16 bin) |
+| `tokens_embed_num` | int | Vocabulary size |
+| `tokens_embed_size` | int | Embedding dimension |
 
-## 通用 / 分词
+## General / tokenization
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `system_prompt` | 空 | 缺省系统提示词。**仅 `run`(交互)模式**会在缺失时自动前置;**`serve` 模式不会自动注入**(遵循 OpenAI 语义,system 由请求端控制——请求不带 system 就没有 system 段) |
-| `post_config_path` | `post_config.json` | 采样配置文件 |
-| `bos` / `eos` | `true` / `false` | 是否加 BOS/EOS |
+| `system_prompt` | empty | Default system prompt. **Only `run` (interactive) mode** prepends it automatically when it is missing; **`serve` mode does not inject it automatically** (following OpenAI semantics, the system part is controlled by the requester: if the request carries no system message, there is no system section) |
+| `post_config_path` | `post_config.json` | Sampling configuration file |
+| `bos` / `eos` | `true` / `false` | Whether to add BOS/EOS |
 | `pad_token_id` | 0 | pad token id |
-| `enable_thinking`(bool) 或 `thinking_mode`(string) | 模型默认 | 思考开关,见下「思考模式」 |
+| `enable_thinking` (bool) or `thinking_mode` (string) | model default | Thinking switch; see "Thinking mode" below |
 
-### 思考模式
+### Thinking mode
 
-控制**本轮生成模型要不要思考**(thinking / reasoning)。一个开关,两种等价写法:
+Controls **whether the model thinks during the current generation** (thinking / reasoning). It is one switch with two equivalent forms:
 
-- `enable_thinking`(bool):`true`=思考,`false`=不思考;
-- `thinking_mode`(string):`think`=思考,`no_think`=不思考,`default`/`auto`=按模型默认。
+- `enable_thinking` (bool): `true` = think, `false` = do not think;
+- `thinking_mode` (string): `think` = think, `no_think` = do not think, `default`/`auto` = use the model default.
 
-两者都给时 `enable_thinking` 优先;都不给则用模型默认。也可在 `/v1/chat/completions` 请求体里**按次覆盖**(同样支持这两个键,可放在顶层或 `chat_template_kwargs` 下),请求结束后回落到 config 默认。
+If both are given, `enable_thinking` takes precedence; if neither is given, the model default is used. It can also be **overridden per request** in the `/v1/chat/completions` request body (the same two keys are supported, either at the top level or under `chat_template_kwargs`); after the request ends, it falls back to the config default.
 
-⚠ **当前真正生效的 tokenizer:Qwen3 全家(Qwen3 / Qwen3VL / Qwen3Omni / Qwen2.5 / Qwen3.5)、MiniCPM5。** 其它 tokenizer 暂不支持该开关——设置会被**忽略并在日志告警一次**(不会再静默无效)。`no_think` 的实现方式是对齐各自官方模板(如 Qwen3 在生成提示后注入空 `<think>\n\n</think>` 块)。
+⚠ **Tokenizers on which it currently takes effect: the whole Qwen3 family (Qwen3 / Qwen3VL / Qwen3Omni / Qwen2.5 / Qwen3.5) and MiniCPM5.** Other tokenizers do not support this switch yet: the setting is **ignored and a warning is logged once** (it no longer fails silently). `no_think` is implemented by following each model's official template (e.g. for Qwen3, an empty `<think>\n\n</think>` block is injected after the generation prompt).
 
-> 注意:这与 `think_in_prompt` 是**两回事**。`think_in_prompt` 指"多轮历史里 assistant 旧的思考内容是否保留",由 tokenizer 类型自动决定(仅 Gemma4/Gemma4VL 为 false,其余保留),**不可配置**,与本开关无关。
+> Note: this is **not the same thing** as `think_in_prompt`. `think_in_prompt` means "whether the assistant's earlier thinking content is kept in the multi-turn history"; it is determined automatically by the tokenizer type (false only for Gemma4/Gemma4VL, kept for all others), is **not configurable**, and is unrelated to this switch.
 
-## 加载与内存
+## Loading and memory
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `use_mmap_load_embed`(别名 `b_use_mmap_load_embed`) | `false` | embedding 用 mmap 加载(省内存) |
-| `use_mmap_load_layer`(别名 `b_use_mmap_load_layer`) | `true`(仅 AX650) | 层权重用 mmap |
-| `dynamic_load_enable` | `false` | 动态加载层(省 CMM,降速),见 README |
-| `dynamic_load_pool_size` | `2` | 动态加载常驻层数(仅 enable 时) |
-| **`mem_guard_enable`** | `true` | **加载前内存预检总开关**(见下「内存安全预检」) |
-| **`mem_guard_floor_mb`** | `128` | 估算占用之上额外保留的安全余量(MB) |
-| **`mem_guard_on_unsafe`** | `prompt` | 不安全时:`prompt`(有TTY弹Y/N,无TTY=abort)/ `abort` / `warn` |
+| `use_mmap_load_embed` (alias `b_use_mmap_load_embed`) | `false` | Load the embedding with mmap (saves memory) |
+| `use_mmap_load_layer` (alias `b_use_mmap_load_layer`) | `true` (AX650 only) | Use mmap for layer weights |
+| `dynamic_load_enable` | `false` | Dynamic layer loading (saves CMM, reduces speed); see README |
+| `dynamic_load_pool_size` | `2` | Number of resident layers for dynamic loading (only when enabled) |
+| **`mem_guard_enable`** | `true` | **Master switch for the pre-load memory check** (see "Memory safety pre-check" below) |
+| **`mem_guard_floor_mb`** | `128` | Extra safety margin (MB) reserved on top of the estimated usage |
+| **`mem_guard_on_unsafe`** | `prompt` | When unsafe: `prompt` (Y/N prompt when there is a TTY; without a TTY = abort) / `abort` / `warn` |
 
-### 内存安全预检（防止超 CMM/DDR 加载导致驱动崩溃）
+### Memory safety pre-check (prevents driver crashes caused by loading beyond CMM/DDR)
 
-开启后分**两道**核对剩余内存,任一不安全都按 `mem_guard_on_unsafe` 处理。
+When enabled, the remaining memory is checked in **two stages**; if either stage finds it unsafe, it is handled according to `mem_guard_on_unsafe`.
 
-**① 加载前（按文件大小估算）** —— 拦住"明显放不下"的模型:
+**① Before loading (estimated from file sizes)** — stops models that "clearly do not fit":
 
-- **CMM**(设备显存,各层 / post / 视觉&音频编码器):AX650 读 `/proc/ax_proc/mem_cmm_info`,AXCL 用 `axcl_GetCMMRemain`,多卡按各卡分别核算。
-- **DDR**(主机内存,token embedding 非 mmap 时 / Gemma per-layer 权重):读 `/proc/meminfo` 的 **MemAvailable**(已扣可回收 buffer/cache,是"真正可用",避免误报)。
+- **CMM** (device memory; each layer / post / vision & audio encoders): AX650 reads `/proc/ax_proc/mem_cmm_info`, AXCL uses `axcl_GetCMMRemain`; with multiple cards, each card is accounted for separately.
+- **DDR** (host memory; the token embedding when it is not mmap-loaded / Gemma per-layer weights): reads **MemAvailable** from `/proc/meminfo` (it already accounts for reclaimable buffer/cache and is the "truly available" amount, which avoids false alarms).
 
-**② 加载中（实测外推）** —— 文件大小估不到引擎加载每层时额外分配的 KV/IO 缓冲(约比纯权重多 ~30%,且随 context 长度增长)。故加载层时按**实测的每层 CMM 增量**外推"剩余层 + post 尾部",一旦预计突破 floor 就**在分配前中止**(此时只加载了头几层,可干净回收,驱动不崩)。多卡并行加载时任一卡触发会停下其它卡。注:此阶段不再交互弹窗(①已问过),`prompt` 在此等同 `abort`。
+**② During loading (extrapolated from measurements)** — file sizes cannot capture the extra KV/IO buffers that the engine allocates when it loads each layer (roughly ~30% more than the weights alone, and growing with the context length). Therefore, while loading layers, it extrapolates "remaining layers + post tail" from the **measured per-layer CMM increase**, and as soon as the projection would go below the floor, it **aborts before allocating** (at that point only the first few layers have been loaded, so they can be reclaimed cleanly and the driver does not crash). When loading in parallel on multiple cards, a trigger on any card stops the other cards. Note: no interactive prompt is shown at this stage (① has already asked), so `prompt` is equivalent to `abort` here.
 
-判定:若 `剩余 - 估算 < mem_guard_floor_mb` → `abort` 直接中止并报错;`warn` 仅告警继续;`prompt` 在交互式终端弹 `[y/N]`(默认 N=不加载),无终端(serve/docker)时退化为 `abort`。
+Decision rule: if `remaining - estimate < mem_guard_floor_mb` → `abort` stops immediately with an error; `warn` only warns and continues; `prompt` shows `[y/N]` in an interactive terminal (default N = do not load), and falls back to `abort` when there is no terminal (serve/docker).
 
-- 关闭:`mem_guard_enable=false`。
-- `dynamic_load_enable=true`:层权重加载后即释放,①不计层权重,②仍按实测拦截层 IO。
-- 多槽(`kv_cache_slots>1`)的 N×KV 申请本就按已知真实尺寸精确预算,并把 `mem_guard_floor_mb` 作为保留余量(取与内置 256MB/512MB 的较大者)。
+- Disable: `mem_guard_enable=false`.
+- `dynamic_load_enable=true`: layer weights are released right after loading, so ① does not count layer weights, and ② still intercepts layer IO based on measurements.
+- With multiple slots (`kv_cache_slots>1`), the N×KV allocation is already budgeted precisely from the known real sizes, and `mem_guard_floor_mb` is used as the reserved margin (the larger of it and the built-in 256MB/512MB is used).
 
-## 注意力(混合注意力 / 长上下文模型)
+## Attention (hybrid attention / long-context models)
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `full_attention_interval` | 0 | 每 N 层(1-indexed)为 full-attention,其余 linear(如 Qwen3.5) |
-| `layer_types` | 空 | 显式每层类型数组(`full_attention`/`linear_attention`/`sliding_attention`) |
-| `sliding_window` | 0 | 滑动窗口大小 |
-| `num_kv_shared_layers` | 0 | 末尾共享 KV 的层数 |
+| `full_attention_interval` | 0 | Every N-th layer (1-indexed) is full-attention, the rest are linear (e.g. Qwen3.5) |
+| `layer_types` | empty | Explicit per-layer type array (`full_attention`/`linear_attention`/`sliding_attention`) |
+| `sliding_window` | 0 | Sliding window size |
+| `num_kv_shared_layers` | 0 | Number of trailing layers that share KV |
 
-> 这几项也可不在 `config.json` 顶层写:`full_attention_interval` / `num_kv_shared_layers` 会回退读 `text_config.*`;`sliding_window` / `layer_types` 未配置时会自动从模型目录下分词器的 sidecar config 读取。
+> These fields do not have to be written at the top level of `config.json`: `full_attention_interval` / `num_kv_shared_layers` fall back to reading `text_config.*`; when `sliding_window` / `layer_types` are not configured, they are read automatically from the tokenizer's sidecar config in the model directory.
 
-## 多槽前缀 KV 缓存（serve 多用户/多提示词加速）
+## Multi-slot prefix KV cache (speeding up serve for multiple users / multiple prompts)
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `kv_cache_slots` | 1 | 槽数,1=关闭(等于现状) |
-| `kv_cache_slot_location` | `device` | `device`(零拷贝指针切换)/ `host`(省 CMM,切换拷贝) |
+| `kv_cache_slots` | 1 | Number of slots; 1 = disabled (same as the existing behavior) |
+| `kv_cache_slot_location` | `device` | `device` (zero-copy pointer switching) / `host` (saves CMM, copies on switch) |
 
-详见 [multi_slot_kv_cache.md](multi_slot_kv_cache.md)。
+See [multi_slot_kv_cache.md](multi_slot_kv_cache.md) for details.
 
-## VLM / 视觉 / 音频
+## VLM / vision / audio
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `vlm_type`(别名 `VLM_TYPE`) | `None` | `Qwen2_5VL`/`Qwen3VL`/`InternVL3`/`FastVLM`/`SmolVLM2`/`PaddleOCRVL`/`Gemma4VL`/`MiniCPMV46VL` |
-| `filename_image_encoder_axmodel` | — | 视觉编码器 axmodel(VLM 必填) |
-| `filename_audio_encoder_axmodel_5s` / `_30s` | — | Gemma4 音频编码器(ASR) |
-| `vision_cache_dir` | 空 | 视觉 embedding 磁盘缓存目录 |
-| `vision_width` / `vision_height` | 448 | 视觉输入尺寸(未配置时按编码器输入形状自动推断) |
-| `vision_patch_size` / `vision_temporal_patch_size` / `vision_spatial_merge_size` | 14 / 2 / 2 | patchify 参数 |
-| `vision_fps` / `vision_tokens_per_second` | 1 / 1 | 视频时间缩放(Qwen2.5-VL mRoPE) |
-| `vision_num_frames` / `vision_do_sample_frames` | 0 / true | 视频抽帧上限 / 是否均匀抽帧 |
+| `vlm_type` (alias `VLM_TYPE`) | `None` | `Qwen2_5VL`/`Qwen3VL`/`InternVL3`/`FastVLM`/`SmolVLM2`/`PaddleOCRVL`/`Gemma4VL`/`MiniCPMV46VL` |
+| `filename_image_encoder_axmodel` | — | Vision encoder axmodel (required for VLM) |
+| `filename_audio_encoder_axmodel_5s` / `_30s` | — | Gemma4 audio encoder (ASR) |
+| `vision_cache_dir` | empty | Disk cache directory for vision embeddings |
+| `vision_width` / `vision_height` | 448 | Vision input size (inferred automatically from the encoder input shape when not configured) |
+| `vision_patch_size` / `vision_temporal_patch_size` / `vision_spatial_merge_size` | 14 / 2 / 2 | patchify parameters |
+| `vision_fps` / `vision_tokens_per_second` | 1 / 1 | Video time scaling (Qwen2.5-VL mRoPE) |
+| `vision_num_frames` / `vision_do_sample_frames` | 0 / true | Maximum number of sampled video frames / whether to sample frames uniformly |
 
-> **视觉缓存(vision_cache)环境变量:**
-> - `AXLLM_VISION_CACHE=0`：完全关闭视觉缓存(磁盘+内存)。
-> - `AXLLM_VISION_MEM_CACHE_SIZE=<N>`：内存缓存条数上限(默认 8,LRU 淘汰;保护长跑 serve)。
-> - `AXLLM_VISION_DISK_CACHE_MAX_MB=<MB>`：磁盘缓存目录总量上限(默认 1024),超出按 mtime 最旧优先淘汰 `.bin`。
-> - `AXLLM_VISION_DISK_CACHE_MIN_FREE_MB=<MB>`：写盘前最小剩余空间(默认 300);低于阈值则跳过写盘(仍用内存缓存),避免塞满磁盘拖垮系统服务。
+> **Vision cache (vision_cache) environment variables:**
+> - `AXLLM_VISION_CACHE=0`: disables the vision cache completely (disk + memory).
+> - `AXLLM_VISION_MEM_CACHE_SIZE=<N>`: maximum number of entries in the memory cache (default 8, LRU eviction; protects long-running serve).
+> - `AXLLM_VISION_DISK_CACHE_MAX_MB=<MB>`: maximum total size of the disk cache directory (default 1024); when it is exceeded, `.bin` files are evicted oldest mtime first.
+> - `AXLLM_VISION_DISK_CACHE_MIN_FREE_MB=<MB>`: minimum free space required before writing to disk (default 300); below this threshold the disk write is skipped (the memory cache is still used), to avoid filling up the disk and bringing down system services.
 
 ## Embedding
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `is_embedding`(别名 `embedding`;旧 `embedding_type`/`EMBEDDING_TYPE` 已废弃) | `false` | 以 Embedding 模式启动,提供 `/v1/embeddings`(不支持 `run`) |
+| `is_embedding` (alias `embedding`; the old `embedding_type`/`EMBEDDING_TYPE` are deprecated) | `false` | Start in Embedding mode and provide `/v1/embeddings` (`run` is not supported) |
 
-## Gemma4 per-layer 投影
+## Gemma4 per-layer projection
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| `hidden_size_per_layer_input` | per-layer 投影维度(>0 时启用) |
+| `hidden_size_per_layer_input` | per-layer projection dimension (enabled when >0) |
 | `rms_norm_eps` | RMSNorm eps |
-| `filename_tokens_embed_per_layer` / `filename_per_layer_model_projection` / `filename_per_layer_projection_norm` | per-layer 权重文件 |
+| `filename_tokens_embed_per_layer` / `filename_per_layer_model_projection` / `filename_per_layer_projection_norm` | per-layer weight files |
 
-## 服务（serve）
+## Serving (serve)
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `port` | 8000 | 监听端口 |
-| `server_timeout_ms` | 300000 | 请求超时(并发排队也复用该值)。也可用命令行 `--server_timeout_ms <ms>` 覆盖;serve 启动时会打印生效值 `server request/queue timeout: N ms` |
-| `server_default_max_tokens` | 0 | 请求未带 max_tokens 时的默认值(0=用内置默认) |
-| `server_max_output_tokens` | 0 | 输出 token 硬上限(0=不额外限制) |
-| `server_forced_prompt_text` | — | 强制提示词(如 OCR 规整) |
+| `port` | 8000 | Listening port |
+| `server_timeout_ms` | 300000 | Request timeout (also reused for concurrent queueing). It can also be overridden on the command line with `--server_timeout_ms <ms>`; at serve startup the effective value is printed as `server request/queue timeout: N ms` |
+| `server_default_max_tokens` | 0 | Default value used when a request does not carry max_tokens (0 = use the built-in default) |
+| `server_max_output_tokens` | 0 | Hard limit on output tokens (0 = no additional limit) |
+| `server_forced_prompt_text` | — | Forced prompt (e.g. for OCR normalization) |
 
-## 采样 / 后处理（post_config.json）
+## Sampling / post-processing (post_config.json)
 
-采样参数放在模型目录的 `post_config.json`(与 `config.json` 同级,由 `post_config_path` 指定)。所有键均可选,缺失即按默认/关闭处理。
+Sampling parameters go in `post_config.json` in the model directory (at the same level as `config.json`, specified by `post_config_path`). All keys are optional; a missing key is treated as default/disabled.
 
-| 键 | 默认 | 说明 |
+| Key | Default | Description |
 |---|---|---|
-| `enable_temperature` / `temperature` | false / 1.0 | 温度。**注意**:启用温度但未开 `top_k`/`top_p` 时,会对完整分布做多项式采样(此前会被当成 greedy 忽略);`temperature<=0` 视为 greedy。 |
-| `enable_top_k_sampling` / `top_k` | false / 1 | top-k 采样(k 自动夹到词表大小)。 |
-| `enable_top_p_sampling` / `top_p` | false / 1.0 | nucleus 采样;与 top_k 同开时优先 top_p。 |
-| `enable_repetition_penalty` / `repetition_penalty` / `penalty_window` | false / 1.0 / 20 | 重复惩罚(仅作用于最近 `penalty_window` 个 token)。 |
-| `frequency_penalty` | 0.0 | OpenAI 式频率惩罚:`logit -= frequency_penalty × 出现次数`(在 `penalty_window` 窗口内统计);非 0 即启用。 |
-| `presence_penalty` | 0.0 | OpenAI 式存在惩罚:`logit -= presence_penalty`(窗口内出现过即减一次);非 0 即启用。 |
+| `enable_temperature` / `temperature` | false / 1.0 | Temperature. **Note**: when temperature is enabled but `top_k`/`top_p` are not, multinomial sampling is performed over the full distribution (previously this was ignored and treated as greedy); `temperature<=0` is treated as greedy. |
+| `enable_top_k_sampling` / `top_k` | false / 1 | top-k sampling (k is automatically clamped to the vocabulary size). |
+| `enable_top_p_sampling` / `top_p` | false / 1.0 | nucleus sampling; when enabled together with top_k, top_p takes precedence. |
+| `enable_repetition_penalty` / `repetition_penalty` / `penalty_window` | false / 1.0 / 20 | Repetition penalty (applies only to the most recent `penalty_window` tokens). |
+| `frequency_penalty` | 0.0 | OpenAI-style frequency penalty: `logit -= frequency_penalty × occurrences` (counted within the `penalty_window` window); enabled when non-zero. |
+| `presence_penalty` | 0.0 | OpenAI-style presence penalty: `logit -= presence_penalty` (subtracted once if the token appeared within the window); enabled when non-zero. |
 
-**每请求覆盖(serve / OpenAI 兼容 API):** 请求体里的 `temperature`、`top_p`、`frequency_penalty`、`presence_penalty` 覆盖该请求的 config 默认,请求结束后自动回落。例:
+**Per-request override (serve / OpenAI-compatible API):** `temperature`, `top_p`, `frequency_penalty` and `presence_penalty` in the request body override the config defaults for that request, and fall back automatically after the request ends. Example:
 
 ```json
 POST /v1/chat/completions
@@ -156,41 +158,41 @@ POST /v1/chat/completions
   "temperature": 0.7, "frequency_penalty": 0.5, "presence_penalty": 0.3 }
 ```
 
-> serve 语义:请求若既不带 `temperature` 也不带 `top_p`,该请求按 greedy 处理(惩罚仍会作用于 argmax)。
+> serve semantics: if a request carries neither `temperature` nor `top_p`, that request is handled as greedy (penalties still apply to the argmax).
 
-## AXCL（PCIe 多卡）
+## AXCL (PCIe multi-card)
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `devices` | `[0]` | 使用的设备 id 列表(多卡张量并行) |
+| `devices` | `[0]` | List of device ids to use (multi-card tensor parallelism) |
 
-> **环境变量覆盖**:`AXLLM_DEVICES=0,1 axllm run/serve <model_dir>` 会覆盖 config 里的 `devices`(逗号分隔的设备 id),无需改 config.json。常用于多卡上各起一个模型实例跑测试,例如:
+> **Environment variable override**: `AXLLM_DEVICES=0,1 axllm run/serve <model_dir>` overrides `devices` in the config (comma-separated device ids), with no need to edit config.json. It is commonly used to start a separate model instance on each set of cards for testing, for example:
 > ```sh
 > AXLLM_DEVICES=0,1 axllm serve <dirA> &
 > AXLLM_DEVICES=2,3 axllm serve <dirB> &
 > ```
-> 仅 AXCL 构建有效;设了但解析不出有效 id 时回退到 config。
+> Only effective in AXCL builds; if it is set but no valid id can be parsed from it, the config value is used.
 
-## 图像生成（SD1.5）
+## Image generation (SD1.5)
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| `model_type` / `task_type` = `image_generation` 或 `is_image_generation=true` | 以图像生成模式启动,提供 `/v1/images/*` |
-| `image_model_dir` | 图像模型根目录 |
+| `model_type` / `task_type` = `image_generation` or `is_image_generation=true` | Start in image generation mode and provide `/v1/images/*` |
+| `image_model_dir` | Root directory of the image model |
 
-## EmbeddingGemma 2（整序列编码器 embedding）
+## EmbeddingGemma 2 (whole-sequence encoder embeddings)
 
-`model_type` = `embedding_gemma2` 时以 `/v1/embeddings` 服务启动(不支持 `run`,仅文本输入)。模型为整序列编码器 axmodel(每个固定长度一个,如 128/512/1024),而不是逐层 axmodel;按输入 token 数自动选择能容纳的最短模型,超长输入保留 BOS 与末尾 EOS 截断。
+With `model_type` = `embedding_gemma2`, axllm starts a `/v1/embeddings` server (no `run` mode, text input only). The model is one whole-sequence encoder axmodel per fixed length (for example 128/512/1024), not per-layer axmodels; the shortest model that fits the input is picked, and longer inputs are truncated keeping BOS and the final EOS.
 
-已转换好的模型见 [jonpark0/embeddinggemma-2-AX650](https://huggingface.co/jonpark0/embeddinggemma-2-AX650)(含文本、图像、音频编码器,本服务只用文本部分)。其 `assets/` 目录已带有 `config.json`,可直接 `axllm serve <路径>/assets`。
+A converted model is published at [jonpark0/embeddinggemma-2-AX650](https://huggingface.co/jonpark0/embeddinggemma-2-AX650) (text, image and audio encoders; this server uses the text ones). Its `assets/` folder already contains a `config.json`, so `axllm serve <path>/assets` works as is.
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `encoder_axmodels` | — | 编码器 axmodel 列表(输入 `inputs_embeds` [1,L,512]、`valid` [1,L],输出 `embedding` [1,768]) |
-| `url_tokenizer_model` / `tokenizer_type` | — / `Gemma4` | tokenizer.axera 导出的分词文件 |
-| `filename_tokens_embed` / `tokens_embed_num` / `tokens_embed_size` | — / `262144` / `512` | bf16 词嵌入表 |
-| `embed_scale` | `22.627417` | 词嵌入缩放(sqrt(512),fp32 计算) |
-| `embedding_dim` / `matryoshka_dims` | `768` / `[768,512,256,128]` | 输出维度及请求 `dimensions` 允许的截断维度(截断后重新归一化) |
-| `bos_token_id` / `eos_token_id` / `pad_token_id` | `2` / `1` / `0` | 特殊 token |
-| `prompts` / `default_prompt` | — / `""` | 任务前缀表;请求用 `input_type` 或 `prompt_name` 选择(如 `query`、`document`) |
-| `devices` | `[0]` | AXCL 设备号(也可用 `AXLLM_DEVICES`) |
+| `encoder_axmodels` | — | Encoder axmodels (inputs `inputs_embeds` [1,L,512] and `valid` [1,L], output `embedding` [1,768]) |
+| `url_tokenizer_model` / `tokenizer_type` | — / `Gemma4` | Tokenizer file exported with tokenizer.axera |
+| `filename_tokens_embed` / `tokens_embed_num` / `tokens_embed_size` | — / `262144` / `512` | bf16 token embedding table |
+| `embed_scale` | `22.627417` | Embedding scale (sqrt(512), applied in fp32) |
+| `embedding_dim` / `matryoshka_dims` | `768` / `[768,512,256,128]` | Output size and the sizes a request's `dimensions` may truncate to (re-normalised after truncation) |
+| `bos_token_id` / `eos_token_id` / `pad_token_id` | `2` / `1` / `0` | Special tokens |
+| `prompts` / `default_prompt` | — / `""` | Task prefixes; a request picks one with `input_type` or `prompt_name` (for example `query`, `document`) |
+| `devices` | `[0]` | AXCL device id (or `AXLLM_DEVICES`) |

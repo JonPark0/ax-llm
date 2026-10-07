@@ -1,8 +1,8 @@
 # AXLLM의 SD1.5 이미지 생성 지원 구현 설명
 
-[English](../en/sd15_axllm_implementation.md) | [中文](../sd15_axllm_implementation.md) | **한국어**
+[English](../sd15_axllm_implementation.md) | [中文](../zh/sd15_axllm_implementation.md) | **한국어**
 
-> 중국어 [원문](../sd15_axllm_implementation.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
+> 중국어 [원문](../zh/sd15_axllm_implementation.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
 
 이 문서는 이 브랜치에서 `axllm serve`가 AX650 위에서 순수 C++ 방식으로
 SD1.5 기반 `lcm-lora-sdv1-5` 모델을 실행하고, 이를 OpenAI 호환 이미지 API를 통해

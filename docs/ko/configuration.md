@@ -1,8 +1,8 @@
 # 설정 파일 설명(모델 디렉터리 `config.json`)
 
-[English](../en/configuration.md) | [中文](../configuration.md) | **한국어**
+[English](../configuration.md) | [中文](../zh/configuration.md) | **한국어**
 
-> 중국어 [원문](../configuration.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
+> 중국어 [원문](../zh/configuration.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
 
 `axllm`은 시작할 때 `<model_dir>/config.json`을 읽습니다. 아래에 사용 가능한 모든 필드를 용도별로 묶어 나열합니다. **필수로 표시되지 않은 필드는 모두 선택 사항**이며, 지정하지 않으면 기본값을 사용합니다.
 

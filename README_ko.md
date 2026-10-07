@@ -1,8 +1,8 @@
 # AX-LLM
 
-[English](README_en.md) | [中文](README.md) | **한국어**
+[English](README.md) | [中文](README_zh.md) | **한국어**
 
-> 중국어 원문 [README.md](README.md)를 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
+> 중국어 원문 [README_zh.md](README_zh.md)를 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
 
 ![GitHub License](https://img.shields.io/github/license/AXERA-TECH/ax-llm)
 

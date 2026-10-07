@@ -1,8 +1,8 @@
 # 멀티 슬롯 프리픽스 KV 캐시(Multi-Slot Prefix KV Cache)
 
-[English](../en/multi_slot_kv_cache.md) | [中文](../multi_slot_kv_cache.md) | **한국어**
+[English](../multi_slot_kv_cache.md) | [中文](../zh/multi_slot_kv_cache.md) | **한국어**
 
-> 중국어 [원문](../multi_slot_kv_cache.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
+> 중국어 [원문](../zh/multi_slot_kv_cache.md)을 번역한 문서입니다. 내용이 다르면 원문을 기준으로 합니다.
 
 브랜치: `ax-prefix-cache-multi-slot`
 
