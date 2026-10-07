@@ -30,6 +30,7 @@
 - Gemma4
 - Llama3
 - HY-MT1.5-1.8B
+- EmbeddingGemma 2 (text embedding, `model_type: embedding_gemma2`, see [docs/en/configuration.md](docs/en/configuration.md))
 - ...
 
 #### VLM (multimodal)

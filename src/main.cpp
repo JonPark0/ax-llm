@@ -37,6 +37,7 @@
 
 #include "runner/LLM.hpp"
 #include "runner/image/sd15_image_generator.hpp"
+#include "runner/EmbeddingGemma2.hpp"
 #include "openai_api/server.hpp"
 #include "runner/utils/memory_utils.hpp"
 #include "runner/utils/net_utils.hpp"
@@ -274,9 +275,12 @@ struct ModelConfig
     bool is_embedding = false;
     bool is_image_generation = false;
     std::string image_model_dir = ".";
+    bool is_embedding_gemma2 = false;  // model_type "embedding_gemma2": whole-sequence encoder axmodels
+    EmbeddingGemma2Config eg2;
 
     bool is_embedding_model() const { return is_embedding; }
     bool is_image_generation_model() const { return is_image_generation; }
+    bool is_embedding_gemma2_model() const { return is_embedding_gemma2; }
 
     static std::optional<nlohmann::json> load_json_file(const std::filesystem::path &path)
     {
@@ -397,6 +401,46 @@ struct ModelConfig
             std::ifstream f(config_path);
             nlohmann::json j;
             f >> j;
+
+            if (j.contains("model_type") && j["model_type"].is_string() &&
+                j["model_type"].get<std::string>() == "embedding_gemma2")
+            {
+                is_embedding_gemma2 = true;
+                is_embedding = false;
+                is_image_generation = false;
+                if (j.contains("model_name")) model_name = j["model_name"].get<std::string>();
+                if (j.contains("port")) port = j["port"].get<int>();
+                if (j.contains("server_timeout_ms")) server_timeout_ms = j["server_timeout_ms"].get<int>();
+                eg2.model_name = model_name;
+                eg2.tokenizer_type = j.value("tokenizer_type", eg2.tokenizer_type);
+                eg2.tokenizer_path = j.value("url_tokenizer_model", std::string());
+                eg2.embed_path = j.value("filename_tokens_embed", std::string());
+                eg2.vocab_size = j.value("tokens_embed_num", eg2.vocab_size);
+                eg2.hidden_size = j.value("tokens_embed_size", eg2.hidden_size);
+                eg2.embed_scale = j.value("embed_scale", eg2.embed_scale);
+                eg2.embedding_dim = j.value("embedding_dim", eg2.embedding_dim);
+                eg2.bos_token_id = j.value("bos_token_id", eg2.bos_token_id);
+                eg2.eos_token_id = j.value("eos_token_id", eg2.eos_token_id);
+                eg2.pad_token_id = j.value("pad_token_id", eg2.pad_token_id);
+                eg2.default_prompt = j.value("default_prompt", std::string());
+                if (j.contains("encoder_axmodels"))
+                    eg2.encoder_axmodels = j["encoder_axmodels"].get<std::vector<std::string>>();
+                if (j.contains("matryoshka_dims"))
+                    eg2.matryoshka_dims = j["matryoshka_dims"].get<std::vector<int>>();
+                if (j.contains("prompts") && j["prompts"].is_object())
+                    for (auto &[name, prefix] : j["prompts"].items()) eg2.prompts[name] = prefix.get<std::string>();
+                if (j.contains("devices") && j["devices"].is_array())
+                    eg2.dev_ids = j["devices"].get<std::vector<int>>();
+                if (const char *env = std::getenv("AXLLM_DEVICES"); env && *env)
+                    eg2.dev_ids = {std::atoi(env)};
+                if (eg2.tokenizer_path.empty() || eg2.embed_path.empty() || eg2.encoder_axmodels.empty())
+                {
+                    ALOGE("embedding_gemma2 config needs url_tokenizer_model, filename_tokens_embed and encoder_axmodels");
+                    return false;
+                }
+                attr.post_config_path.clear();
+                return true;
+            }
 
             is_image_generation = false;
             if (j.contains("model_type") && j["model_type"].is_string())
@@ -780,6 +824,13 @@ void resolve_config_paths(ModelConfig &config, const std::string &model_path)
     if (config.is_image_generation_model())
     {
         config.image_model_dir = resolve_path(model_path, config.image_model_dir);
+        return;
+    }
+    if (config.is_embedding_gemma2_model())
+    {
+        config.eg2.tokenizer_path = resolve_path(model_path, config.eg2.tokenizer_path);
+        config.eg2.embed_path = resolve_path(model_path, config.eg2.embed_path);
+        for (auto &p : config.eg2.encoder_axmodels) p = resolve_path(model_path, p);
         return;
     }
 
@@ -2184,6 +2235,80 @@ int run_server_mode(const ModelConfig &config, int port)
 
     std::string model_name = config.model_name;
 
+    if (config.is_embedding_gemma2_model())
+    {
+        auto embedder = std::make_shared<EmbeddingGemma2>();
+        std::string err;
+        if (!embedder->Init(config.eg2, err))
+        {
+            ALOGE("EmbeddingGemma2 init failed: %s", err.c_str());
+            embedder.reset();
+#if USE_AXCL
+            axclFinalize();
+#else
+            AX_ENGINE_Deinit();
+            AX_SYS_Deinit();
+#endif
+            return -1;
+        }
+        g_server.setModelExtraFields(model_name, {
+            {"max_token_len", embedder->max_tokens()},
+            {"embedding_dim", config.eg2.embedding_dim},
+        });
+        g_server.registerEmbedding(model_name, [embedder](const openai_api::EmbeddingRequest &req,
+                                                          std::shared_ptr<openai_api::BaseDataProvider> provider)
+                                   {
+            if (!provider->is_writable()) return;
+            if (!req.encoding_format.empty() && req.encoding_format != "float") {
+                ALOGW("embedding encoding_format='%s' is not supported, using float", req.encoding_format.c_str());
+            }
+            if (req.raw.contains("messages")) {
+                provider->push(openai_api::OutputChunk::Error("invalid_request_error",
+                    "embedding_gemma2 takes text `input` only; use the Python server for images/audio"));
+                provider->end();
+                return;
+            }
+            std::string prompt_name;
+            for (const char *key : {"prompt_name", "input_type"}) {
+                if (prompt_name.empty() && req.raw.contains(key) && req.raw[key].is_string())
+                    prompt_name = req.raw[key].get<std::string>();
+            }
+            std::vector<std::vector<float>> embeds;
+            int tokens = 0;
+            std::string err;
+            if (!embedder->Embed(req.inputs, prompt_name, req.dimensions, embeds, tokens, err)) {
+                provider->push(openai_api::OutputChunk::Error("invalid_request_error", err));
+                provider->end();
+                return;
+            }
+            auto chunk = openai_api::OutputChunk::BatchEmbeddings(embeds, req.model);
+            chunk.usage.prompt_tokens = tokens;
+            chunk.usage.total_tokens = tokens;
+            provider->push(chunk);
+            provider->end(); });
+
+        printf("Starting server on port %d with embedding model '%s' (EmbeddingGemma 2, max %d tokens)...\n",
+               port, model_name.c_str(), embedder->max_tokens());
+        printf("API URLs:\n");
+        for (const auto &host : std::vector<std::string>{"127.0.0.1"})
+        {
+            const std::string base = "http://" + host + ":" + std::to_string(port);
+            printf("  GET  %s/v1/models\n", base.c_str());
+            printf("  POST %s/v1/embeddings\n", base.c_str());
+        }
+        int timeout_ms = config.server_timeout_ms > 0 ? config.server_timeout_ms : 300000;
+        g_server.setTimeout(std::chrono::milliseconds(timeout_ms));
+        g_server.run(port);
+        embedder->Deinit();
+#if USE_AXCL
+        axclFinalize();
+#else
+        AX_ENGINE_Deinit();
+        AX_SYS_Deinit();
+#endif
+        return 0;
+    }
+
     if (config.is_image_generation_model())
     {
         auto generator_uptr = sd15::create_image_generator();
@@ -2913,7 +3038,7 @@ int main(int argc, char *argv[])
 
     if (mode == "run")
     {
-        if (config.is_embedding_model())
+        if (config.is_embedding_model() || config.is_embedding_gemma2_model())
         {
             ALOGE("Embedding models do not support interactive `run` mode. Please use `serve` mode with `/v1/embeddings`.");
             return -1;

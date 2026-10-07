@@ -30,6 +30,7 @@
 - Gemma4
 - Llama3
 - HY-MT1.5-1.8B
+- EmbeddingGemma 2(텍스트 임베딩, `model_type: embedding_gemma2`, [docs/ko/configuration.md](docs/ko/configuration.md) 참고)
 - ...
 
 #### VLM(멀티모달)

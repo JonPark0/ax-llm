@@ -28,6 +28,7 @@
 - Gemma4
 - Llama3
 - HY-MT1.5-1.8B
+- EmbeddingGemma 2(文本 Embedding,`model_type: embedding_gemma2`,见 [docs/configuration.md](docs/configuration.md))
 - ...
 
 #### VLM（多模态）

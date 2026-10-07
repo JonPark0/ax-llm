@@ -179,3 +179,18 @@ POST /v1/chat/completions
 |---|---|
 | `model_type` / `task_type` = `image_generation` 또는 `is_image_generation=true` | 이미지 생성 모드로 시작하여 `/v1/images/*` 엔드포인트를 제공합니다 |
 | `image_model_dir` | 이미지 모델 루트 디렉터리 |
+
+## EmbeddingGemma 2(전체 시퀀스 인코더 임베딩)
+
+`model_type` = `embedding_gemma2`이면 `/v1/embeddings` 서버로 시작합니다(`run` 모드 미지원, 텍스트 입력만). 모델은 층별 axmodel이 아니라 고정 길이(예: 128/512/1024)마다 하나씩인 전체 시퀀스 인코더 axmodel이며, 입력이 들어가는 가장 짧은 모델을 자동으로 고릅니다. 더 긴 입력은 BOS와 마지막 EOS를 남기고 잘라냅니다.
+
+| 필드 | 기본값 | 설명 |
+|---|---|---|
+| `encoder_axmodels` | — | 인코더 axmodel 목록(입력 `inputs_embeds` [1,L,512]·`valid` [1,L], 출력 `embedding` [1,768]) |
+| `url_tokenizer_model` / `tokenizer_type` | — / `Gemma4` | tokenizer.axera로 내보낸 토크나이저 파일 |
+| `filename_tokens_embed` / `tokens_embed_num` / `tokens_embed_size` | — / `262144` / `512` | bf16 토큰 임베딩 표 |
+| `embed_scale` | `22.627417` | 임베딩 배율(sqrt(512), fp32로 계산) |
+| `embedding_dim` / `matryoshka_dims` | `768` / `[768,512,256,128]` | 출력 차원과 요청의 `dimensions`로 줄일 수 있는 차원(축소 후 다시 정규화) |
+| `bos_token_id` / `eos_token_id` / `pad_token_id` | `2` / `1` / `0` | 특수 토큰 |
+| `prompts` / `default_prompt` | — / `""` | 작업 접두어 목록. 요청에서 `input_type` 또는 `prompt_name`으로 고릅니다(예: `query`, `document`) |
+| `devices` | `[0]` | AXCL 장치 번호(`AXLLM_DEVICES`로도 지정 가능) |

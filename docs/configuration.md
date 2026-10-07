@@ -177,3 +177,18 @@ POST /v1/chat/completions
 |---|---|
 | `model_type` / `task_type` = `image_generation` 或 `is_image_generation=true` | 以图像生成模式启动,提供 `/v1/images/*` |
 | `image_model_dir` | 图像模型根目录 |
+
+## EmbeddingGemma 2（整序列编码器 embedding）
+
+`model_type` = `embedding_gemma2` 时以 `/v1/embeddings` 服务启动(不支持 `run`,仅文本输入)。模型为整序列编码器 axmodel(每个固定长度一个,如 128/512/1024),而不是逐层 axmodel;按输入 token 数自动选择能容纳的最短模型,超长输入保留 BOS 与末尾 EOS 截断。
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `encoder_axmodels` | — | 编码器 axmodel 列表(输入 `inputs_embeds` [1,L,512]、`valid` [1,L],输出 `embedding` [1,768]) |
+| `url_tokenizer_model` / `tokenizer_type` | — / `Gemma4` | tokenizer.axera 导出的分词文件 |
+| `filename_tokens_embed` / `tokens_embed_num` / `tokens_embed_size` | — / `262144` / `512` | bf16 词嵌入表 |
+| `embed_scale` | `22.627417` | 词嵌入缩放(sqrt(512),fp32 计算) |
+| `embedding_dim` / `matryoshka_dims` | `768` / `[768,512,256,128]` | 输出维度及请求 `dimensions` 允许的截断维度(截断后重新归一化) |
+| `bos_token_id` / `eos_token_id` / `pad_token_id` | `2` / `1` / `0` | 特殊 token |
+| `prompts` / `default_prompt` | — / `""` | 任务前缀表;请求用 `input_type` 或 `prompt_name` 选择(如 `query`、`document`) |
+| `devices` | `[0]` | AXCL 设备号(也可用 `AXLLM_DEVICES`) |

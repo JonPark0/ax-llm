@@ -179,3 +179,18 @@ POST /v1/chat/completions
 |---|---|
 | `model_type` / `task_type` = `image_generation` or `is_image_generation=true` | Start in image generation mode and provide `/v1/images/*` |
 | `image_model_dir` | Root directory of the image model |
+
+## EmbeddingGemma 2 (whole-sequence encoder embeddings)
+
+With `model_type` = `embedding_gemma2`, axllm starts a `/v1/embeddings` server (no `run` mode, text input only). The model is one whole-sequence encoder axmodel per fixed length (for example 128/512/1024), not per-layer axmodels; the shortest model that fits the input is picked, and longer inputs are truncated keeping BOS and the final EOS.
+
+| Field | Default | Description |
+|---|---|---|
+| `encoder_axmodels` | — | Encoder axmodels (inputs `inputs_embeds` [1,L,512] and `valid` [1,L], output `embedding` [1,768]) |
+| `url_tokenizer_model` / `tokenizer_type` | — / `Gemma4` | Tokenizer file exported with tokenizer.axera |
+| `filename_tokens_embed` / `tokens_embed_num` / `tokens_embed_size` | — / `262144` / `512` | bf16 token embedding table |
+| `embed_scale` | `22.627417` | Embedding scale (sqrt(512), applied in fp32) |
+| `embedding_dim` / `matryoshka_dims` | `768` / `[768,512,256,128]` | Output size and the sizes a request's `dimensions` may truncate to (re-normalised after truncation) |
+| `bos_token_id` / `eos_token_id` / `pad_token_id` | `2` / `1` / `0` | Special tokens |
+| `prompts` / `default_prompt` | — / `""` | Task prefixes; a request picks one with `input_type` or `prompt_name` (for example `query`, `document`) |
+| `devices` | `[0]` | AXCL device id (or `AXLLM_DEVICES`) |
